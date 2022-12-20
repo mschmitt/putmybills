@@ -6,11 +6,13 @@ import "errors"
 import "strconv"
 import "github.com/pkg/xattr"
 import "github.com/akamensky/argparse"
+import "github.com/go-resty/resty/v2"
 
 // https://api.getmyinvoices.com/accounts/v3/doc/#tag/Document/operation/Upload%20new%20document
 
 const StatusAttribute string = "user.de.scsy.putmybills.upload-status"
 const DocUidAttribute string = "user.de.scsy.putmybills.document-uid"
+const DocumentAPI string = "https://api.getmyinvoices.com/accounts/v3/documents"
 
 func main() {
 	var err error
@@ -89,6 +91,14 @@ func main() {
 	// Ready to upload
 
 	// Upload to API
+	client := resty.New()
+	// Dummy API interaction (Get list of documents)
+	resp, err := client.R().
+		EnableTrace().
+		SetHeader("Content-Type", "application/json").
+		SetHeader("X-API-KEY", *apitoken).
+		Get(DocumentAPI)
+	fmt.Printf("%+v\n", resp)
 
 	// Test for success: 1) HTTP 200, success = true, documentUid defined
 
