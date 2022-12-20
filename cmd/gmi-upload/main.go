@@ -18,7 +18,7 @@ func main() {
 	apitoken := parser.String("a", "apitoken", &argparse.Options{Required: true, Help: "API token"})
 	file     := parser.String("f", "file", &argparse.Options{Required: true, Help: "File to upload"})
 	doctype  := parser.String("d", "doctype", &argparse.Options{Required: false, Default: "MISC", Help: "GMI document type"})
-	// resume   := parser.Flag("r", "resume", &argparse.Options{Required: false, Help: "Re-attempt dangling incomplete upload"})
+	resume   := parser.Flag("r", "resume", &argparse.Options{Required: false, Help: "Re-attempt dangling incomplete upload"})
 	verbose  := parser.Flag("v", "verbose", &argparse.Options{Required: false, Help: "Show verbose progress"})
 	err = parser.Parse(os.Args)
 	if err != nil {
@@ -42,6 +42,7 @@ func main() {
 	XattrList, err := xattr.FList(fh);
 	if err != nil {
 		fmt.Printf("ERROR: Can't retrieve extended attributes for: %s\n", *file)
+		fh.Close()
 		os.Exit(1)
 	}
 	if true == *verbose {
@@ -55,12 +56,16 @@ func main() {
 	UploadStatus := string(UploadStatusBytes)
 
 	// -> uploading - Previous upload failed without cleanup: error message and exit != 0
-	if UploadStatus == "uploading" {
-		fmt.Printf("ERROR: Aborted upload detected for: %s (maybe retry using --resume)\n", *file)
-		fh.Close()
-		os.Exit(1)
+	if "uploading" == UploadStatus {
+		if true == *resume {
+			fmt.Printf("INFO: Will resume aborted upload for: %s\n", *file)
+		} else {
+			fmt.Printf("ERROR: Aborted upload detected for: %s (maybe retry using --resume)\n", *file)
+			fh.Close()
+			os.Exit(1)
+		}
 	// -> done - Previous upload succeeded, info message and abort
-	} else if UploadStatus == "done" {
+	} else if "done" == UploadStatus {
 		fmt.Printf("File already marked as uploaded: %s\n", *file)
 		fh.Close()
 		os.Exit(0)
