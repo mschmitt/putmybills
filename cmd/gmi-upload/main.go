@@ -13,6 +13,8 @@ import "github.com/akamensky/argparse"
 
 func main() {
 	var err error
+	var UploadStatusBytes []byte
+	var UploadStatus string
 	// Establish arguments
 	parser := argparse.NewParser("gmi-upload", "Upload document to the GetMyInvoices API")
 	apitoken := parser.String("a", "apitoken", &argparse.Options{Required: true, Help: "API token"})
@@ -53,13 +55,13 @@ func main() {
 
 	// Get upload status xattr from file - user.putmybills.upload-status
 	// error is expected at this point (empty attribute). No error handling.
-	UploadStatusBytes, err := xattr.FGet(fh, "user.putmybills.upload-status");
-	UploadStatus := string(UploadStatusBytes)
+	UploadStatusBytes, err = xattr.FGet(fh, "user.putmybills.upload-status");
+	UploadStatus = string(UploadStatusBytes)
 
 	// -> uploading - Previous upload failed without cleanup: error message and exit != 0
 	if "uploading" == UploadStatus {
 		if true == *resume {
-			fmt.Printf("INFO: Will resume aborted upload for: %s\n", *file)
+			fmt.Printf("Will resume aborted upload for: %s\n", *file)
 		} else {
 			fmt.Printf("ERROR: Aborted upload detected for: %s (maybe retry using --resume)\n", *file)
 			fh.Close()
@@ -79,6 +81,11 @@ func main() {
 
 	// Set upload status xattr: uploading
 	err = xattr.FSet(fh, "user.putmybills.upload-status", []byte("uploading"))
+	if err != nil {
+		fmt.Printf("ERROR: Can't set extended attributes for: %s\n", *file)
+		fh.Close()
+		os.Exit(1)
+	}
 
 	// Ready to upload
 	fh.Close()
