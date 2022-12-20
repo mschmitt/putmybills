@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 
-randid="$(openssl rand -hex 2)"
-printf -v pdffile "test-%s.pdf" "${randid}"
-pandoc - -o "${pdffile}" <<Here
+uuid="$(uuid -v4)"
+pandoc - -o "${uuid}.pdf" <<Here
 Upload-Test
 
 Kein Beleg
 
-${randid}
+${uuid}
 Here
