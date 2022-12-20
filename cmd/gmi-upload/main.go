@@ -23,6 +23,7 @@ func main() {
 	err = parser.Parse(os.Args)
 	if err != nil {
 		fmt.Print(parser.Usage(err))
+		os.Exit(1)
 	}
 	if true == *verbose {
 		fmt.Printf("%-13s: %s\n",  "API token",    *apitoken)
