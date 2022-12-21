@@ -10,14 +10,14 @@ import "github.com/go-resty/resty/v2"
 
 // https://api.getmyinvoices.com/accounts/v3/doc/#tag/Document/operation/Upload%20new%20document
 
-const StatusAttribute string = "user.de.scsy.putmybills.upload-status"
-const DocUidAttribute string = "user.de.scsy.putmybills.document-uid"
-const DocumentAPI string = "https://api.getmyinvoices.com/accounts/v3/documents"
+const statusAttribute string = "user.de.scsy.putmybills.upload-status"
+const docUidAttribute string = "user.de.scsy.putmybills.document-uid"
+const documentAPI string = "https://api.getmyinvoices.com/accounts/v3/documents"
 
 func main() {
 	var err error
-	var UploadStatusBytes []byte
-	var UploadStatus string
+	var uploadStatusBytes []byte
+	var uploadStatus string
 
 	// Establish arguments
 	parser := argparse.NewParser("gmi-upload", "Upload document to the GetMyInvoices API")
@@ -59,11 +59,11 @@ func main() {
 
 	// Get upload status xattr from file - user.putmybills.upload-status
 	// error is expected at this point (empty attribute). No error handling.
-	UploadStatusBytes, err = xattr.Get(*file, StatusAttribute);
-	UploadStatus = string(UploadStatusBytes)
+	uploadStatusBytes, err = xattr.Get(*file, statusAttribute);
+	uploadStatus = string(uploadStatusBytes)
 
 	// -> uploading - Previous upload failed without cleanup: error message and exit != 0
-	if "uploading" == UploadStatus {
+	if "uploading" == uploadStatus {
 		if true == *resume {
 			fmt.Printf("Will resume aborted upload for: %s\n", *file)
 		} else {
@@ -71,7 +71,7 @@ func main() {
 			os.Exit(1)
 		}
 	// -> done - Previous upload succeeded, info message and abort
-	} else if "done" == UploadStatus {
+	} else if "done" == uploadStatus {
 		fmt.Printf("File already marked as uploaded: %s\n", *file)
 		os.Exit(0)
 	// -> nothing - Proceed
@@ -82,11 +82,12 @@ func main() {
 	}
 
 	// Set upload status xattr: uploading
-	err = xattr.Set(*file, StatusAttribute, []byte("uploading"))
+	err = xattr.Set(*file, statusAttribute, []byte("uploading"))
 	if err != nil {
 		fmt.Printf("ERROR: Can't set extended attributes for: %s\n", *file)
 		os.Exit(1)
 	}
+	// Read back to confirm if attribute was set
 
 	// Ready to upload
 
@@ -97,7 +98,7 @@ func main() {
 		EnableTrace().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("X-API-KEY", *apitoken).
-		Get(DocumentAPI)
+		Get(documentAPI)
 	fmt.Printf("%+v\n", resp)
 
 	// Test for success: 1) HTTP 200, success = true, documentUid defined
