@@ -4,11 +4,15 @@ import "fmt"
 import "os"
 import "errors"
 import "strconv"
-import "verboseOutput"
+import "path/filepath"
+import "io/ioutil"
+import "encoding/base64"
+import "encoding/json"
 import "github.com/tidwall/gjson"
 import "github.com/pkg/xattr"
 import "github.com/akamensky/argparse"
 import "github.com/go-resty/resty/v2"
+import "verboseOutput"
 
 // https://api.getmyinvoices.com/accounts/v3/doc/#tag/Document/operation/Upload%20new%20document
 
@@ -101,14 +105,40 @@ func main() {
 	// Ready to upload
 	var uploadFailed bool = false;
 
+	// Read file into memory
+	fileBytes, err := ioutil.ReadFile(*file)
+	if nil != err {
+		fmt.Printf("ERROR: Failed to read file: %s\n", err)
+		os.Exit(1)
+	}
+	fileBase64 := base64.StdEncoding.EncodeToString(fileBytes)
+	// verboseOutput.Out(fmt.Sprintf("%s", fileBase64))
+
+	// Build JSON object containing:
+	// - fileName (basename *file)
+	// - documentType (*doctype)
+	// - fileContent (fileBase64)
+	gmiPayloadData := map[string]interface{}{
+		"fileName": filepath.Base(*file),
+		"documentType": *doctype,
+		"fileContent": fileBase64,
+	}
+	gmiPayload, err := json.Marshal(gmiPayloadData)
+	if nil != err {
+		fmt.Printf("ERROR: json encoding failed: %s\n", err)
+		os.Exit(1)
+	}
+	verboseOutput.Out(fmt.Sprintf("%+v\n", string(gmiPayload)))
+
 	// Upload to API
 	client := resty.New()
 	// Dummy API interaction (Get list of documents)
 	response, err := client.R().
 		EnableTrace().
 		SetHeader("Content-Type", "application/json").
-		SetHeader("X-API-KEX", *apitoken).
-		Get(documentAPI)
+		SetHeader("X-API-KEY", *apitoken).
+		SetBody(gmiPayload).
+		Post(documentAPI)
 	if nil != err {
 		fmt.Printf("ERROR: HTTP request to %s failed: %s", documentAPI, err)
 		uploadFailed = true;
@@ -119,7 +149,7 @@ func main() {
 	// HTTP status is 200?
 	verboseOutput.Out(fmt.Sprintf("Checking HTTP status.\n"))
 	if response.StatusCode() != 200 {
-		fmt.Printf("ERROR: HTTP request to %s failed (HTTP status != 200).\n", documentAPI)
+		fmt.Printf("ERROR: HTTP request to %s failed (HTTP status %s != 200).\n", documentAPI, response.StatusCode())
 		uploadFailed = true;
 	}
 
@@ -144,6 +174,7 @@ func main() {
 
 	// Conclusion
 	if true == uploadFailed {
+		fmt.Printf("%s\n", response.String())
 		fmt.Printf("Upload failed.\n")
 		fmt.Printf("Cleaning up.\n")
 		verboseOutput.Out(fmt.Sprintf("Deleting %s xattr on: %s.\n", statusAttribute, *file))
