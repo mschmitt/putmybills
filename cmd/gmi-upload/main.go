@@ -4,6 +4,7 @@ import "fmt"
 import "os"
 import "errors"
 import "strconv"
+import "github.com/tidwall/gjson"
 import "github.com/pkg/xattr"
 import "github.com/akamensky/argparse"
 import "github.com/go-resty/resty/v2"
@@ -58,7 +59,8 @@ func main() {
 	}
 
 	// Get upload status xattr from file - user.putmybills.upload-status
-	// error is expected at this point (empty attribute). No error handling.
+	// - Error is expected at this point (empty attribute). 
+	// - No error handling.
 	uploadStatusBytes, err = xattr.Get(*file, statusAttribute);
 	uploadStatus = string(uploadStatusBytes)
 
@@ -82,35 +84,97 @@ func main() {
 	}
 
 	// Set upload status xattr: uploading
+	if true == *verbose {
+		fmt.Printf("Setting %s xattr to \"%s\" on: %s.\n", statusAttribute, "uploading", *file)
+	}
 	err = xattr.Set(*file, statusAttribute, []byte("uploading"))
 	if err != nil {
 		fmt.Printf("ERROR: Can't set extended attributes for: %s\n", *file)
 		os.Exit(1)
 	}
-	// Read back to confirm if attribute was set
+
+	// Read back to confirm that attribute was set
+	if true == *verbose {
+		fmt.Printf("Reading back %s xattr (expecting: \"%s\") from: %s\n", statusAttribute, "uploading", *file)
+	}
+	uploadStatusBytes, err = xattr.Get(*file, statusAttribute);
+	uploadStatus = string(uploadStatusBytes)
+	if err != nil {
+		fmt.Printf("ERROR: Can't read back attribute %s for: %s\n", statusAttribute, *file)
+		os.Exit(1)
+	}
 
 	// Ready to upload
 
 	// Upload to API
 	client := resty.New()
 	// Dummy API interaction (Get list of documents)
-	resp, err := client.R().
+	response, err := client.R().
 		EnableTrace().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("X-API-KEY", *apitoken).
 		Get(documentAPI)
-	fmt.Printf("%+v\n", resp)
+	if err != nil {
+		fmt.Printf("ERROR: HTTP request to %s failed: %s", documentAPI, err)
+		os.Exit(1)
+	}
 
-	// Test for success: 1) HTTP 200, success = true, documentUid defined
+	// Early abort if HTTP status is not 200
+	if true == *verbose {
+		fmt.Printf("Checking HTTP status.\n")
+	}
+	if response.StatusCode() != 200 {
+		fmt.Printf("ERROR: HTTP request to %s failed: %s\n", documentAPI, response.Status())
+		os.Exit(1)
+	}
 
-	// Set upload documentUid xattr (tbd: name of xattr)
-	// Set upload status xattr: done
-	// Message to user: success, blah
-	// exit 0
+	// Analyze response
+	var uploadFailed bool = false;
+	if true == *verbose {
+		fmt.Printf("Looking for \"success\" in response.\n")
+	}
+	success := gjson.Get(response.String(), "success")
+	if success.Type.String() == "Null" {
+		fmt.Printf("ERROR: No success reported.\n")
+		uploadFailed = true;
+	}
 
-	// If upload failed: 1) HTTP != 200, success != true, documentUid undefined
-	// Unset upload status xattr
-	// Dump JSON if received from server
-	// Error message and exit != 0
+	if true == *verbose {
+		fmt.Printf("Looking for \"documentUid\" in response.\n")
+	}
+	documentUid := gjson.Get(response.String(), "documentUid")
+	if documentUid.Type.String() == "Null" {
+		fmt.Printf("ERROR: No documentUid reported.\n")
+		uploadFailed = true;
+	}
+
+	if uploadFailed == true {
+		fmt.Printf("Upload failed.\n")
+		fmt.Printf("Cleaning up.\n")
+		if true == *verbose {
+			fmt.Printf("Deleting %s xattr on: %s.\n", statusAttribute, *file)
+		}
+		xattr.Remove(*file, statusAttribute)
+		os.Exit(1)
+	} else {
+		fmt.Printf("Upload succeeded.\n")
+		if true == *verbose {
+			fmt.Printf("Setting %s xattr to \"%s\" on: %s.\n", statusAttribute, "done", *file)
+		}
+		err = xattr.Set(*file, statusAttribute, []byte("done"))
+		if err != nil {
+			fmt.Printf("ERROR: Can't set extended attributes for: %s\n", *file)
+			os.Exit(1)
+		}
+		if true == *verbose {
+			fmt.Printf("Setting %s xattr to \"%s\" on: %s.\n", docUidAttribute, documentUid.String(), *file)
+		}
+		err = xattr.Set(*file, docUidAttribute, []byte(documentUid.String()))
+		if err != nil {
+			fmt.Printf("ERROR: Can't set extended attributes for: %s\n", *file)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
 }
 
