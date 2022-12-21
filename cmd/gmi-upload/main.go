@@ -4,6 +4,7 @@ import "fmt"
 import "os"
 import "errors"
 import "strconv"
+import "verboseOutput"
 import "github.com/tidwall/gjson"
 import "github.com/pkg/xattr"
 import "github.com/akamensky/argparse"
@@ -28,16 +29,17 @@ func main() {
 	resume   := parser.Flag("r", "resume", &argparse.Options{Required: false, Help: "Re-attempt dangling incomplete upload"})
 	verbose  := parser.Flag("v", "verbose", &argparse.Options{Required: false, Help: "Show verbose progress"})
 	err = parser.Parse(os.Args)
-	if err != nil {
+	if nil != err {
 		fmt.Print(parser.Usage(err))
 		os.Exit(1)
 	}
 	if true == *verbose {
-		fmt.Printf("%-13s: %s\n",  "API token",    *apitoken)
-		fmt.Printf("%-13s: %s\n", "File",          *file)
-		fmt.Printf("%-13s: %s\n", "Document type", *doctype)
-		fmt.Printf("%-13s: %s\n", "Verbose",       strconv.FormatBool(*verbose))
+		verboseOutput.Activate()
 	}
+	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n",  "API token",    *apitoken))
+	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "File",          *file))
+	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "Document type", *doctype))
+	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "Verbose",       strconv.FormatBool(*verbose)))
 
 	// -> File not found - error message and exit != 0
 	fh, err := os.OpenFile(*file, os.O_RDONLY, 0644)
@@ -49,14 +51,12 @@ func main() {
 
 	// Test file for xattr capability
 	XattrList, err := xattr.List(*file);
-	if err != nil {
+	if nil != err {
 		fmt.Printf("ERROR: Can't retrieve extended attributes for: %s\n", *file)
 		os.Exit(1)
 	}
-	if true == *verbose {
-		fmt.Printf("extended attributes for file: %s\n", *file)
-		fmt.Println(XattrList)
-	}
+	verboseOutput.Out(fmt.Sprintf("extended attributes for file: %s\n", *file))
+	verboseOutput.Out(fmt.Sprintln(XattrList))
 
 	// Get upload status xattr from file - user.putmybills.upload-status
 	// - Error is expected at this point (empty attribute). 
@@ -78,33 +78,28 @@ func main() {
 		os.Exit(0)
 	// -> nothing - Proceed
 	} else {
-		if true == *verbose {
-			fmt.Printf("No xattrs set. Will proceed with upload.\n")
-		}
+		verboseOutput.Out(fmt.Sprintf("No xattrs set. Will proceed with upload.\n"))
 	}
 
 	// Set upload status xattr: uploading
-	if true == *verbose {
-		fmt.Printf("Setting %s xattr to \"%s\" on: %s.\n", statusAttribute, "uploading", *file)
-	}
+	verboseOutput.Out(fmt.Sprintf("Setting %s xattr to \"%s\" on: %s.\n", statusAttribute, "uploading", *file))
 	err = xattr.Set(*file, statusAttribute, []byte("uploading"))
-	if err != nil {
+	if nil != err {
 		fmt.Printf("ERROR: Can't set extended attributes for: %s\n", *file)
 		os.Exit(1)
 	}
 
 	// Read back to confirm that attribute was set
-	if true == *verbose {
-		fmt.Printf("Reading back %s xattr (expecting: \"%s\") from: %s\n", statusAttribute, "uploading", *file)
-	}
+	verboseOutput.Out(fmt.Sprintf("Reading back %s xattr (expecting: \"%s\") from: %s\n", statusAttribute, "uploading", *file))
 	uploadStatusBytes, err = xattr.Get(*file, statusAttribute);
 	uploadStatus = string(uploadStatusBytes)
-	if err != nil {
+	if nil != err {
 		fmt.Printf("ERROR: Can't read back attribute %s for: %s\n", statusAttribute, *file)
 		os.Exit(1)
 	}
 
 	// Ready to upload
+	var uploadFailed bool = false;
 
 	// Upload to API
 	client := resty.New()
@@ -112,65 +107,59 @@ func main() {
 	response, err := client.R().
 		EnableTrace().
 		SetHeader("Content-Type", "application/json").
-		SetHeader("X-API-KEY", *apitoken).
+		SetHeader("X-API-KEX", *apitoken).
 		Get(documentAPI)
-	if err != nil {
+	if nil != err {
 		fmt.Printf("ERROR: HTTP request to %s failed: %s", documentAPI, err)
-		os.Exit(1)
-	}
-
-	// Early abort if HTTP status is not 200
-	if true == *verbose {
-		fmt.Printf("Checking HTTP status.\n")
-	}
-	if response.StatusCode() != 200 {
-		fmt.Printf("ERROR: HTTP request to %s failed: %s\n", documentAPI, response.Status())
-		os.Exit(1)
-	}
-
-	// Analyze response
-	var uploadFailed bool = false;
-	if true == *verbose {
-		fmt.Printf("Looking for \"success\" in response.\n")
-	}
-	success := gjson.Get(response.String(), "success")
-	if success.Type.String() == "Null" {
-		fmt.Printf("ERROR: No success reported.\n")
 		uploadFailed = true;
 	}
 
-	if true == *verbose {
-		fmt.Printf("Looking for \"documentUid\" in response.\n")
+	// Analyze response
+
+	// HTTP status is 200?
+	verboseOutput.Out(fmt.Sprintf("Checking HTTP status.\n"))
+	if response.StatusCode() != 200 {
+		fmt.Printf("ERROR: HTTP request to %s failed (HTTP status != 200).\n", documentAPI)
+		uploadFailed = true;
 	}
+
+	// Success?
+	verboseOutput.Out(fmt.Sprintf("Looking for \"success\" in response.\n"))
+	success := gjson.Get(response.String(), "success")
+	if success.Type.String() == "Null" {
+		fmt.Printf("ERROR: No success reported (not even true or false).\n")
+		uploadFailed = true;
+	} else if success.Bool() != true {
+		fmt.Printf("ERROR: success false reported.\n")
+		uploadFailed = true;
+	}
+
+	// Got documentUid?
+	verboseOutput.Out(fmt.Sprintf("Looking for \"documentUid\" in response.\n"))
 	documentUid := gjson.Get(response.String(), "documentUid")
 	if documentUid.Type.String() == "Null" {
 		fmt.Printf("ERROR: No documentUid reported.\n")
 		uploadFailed = true;
 	}
 
-	if uploadFailed == true {
+	// Conclusion
+	if true == uploadFailed {
 		fmt.Printf("Upload failed.\n")
 		fmt.Printf("Cleaning up.\n")
-		if true == *verbose {
-			fmt.Printf("Deleting %s xattr on: %s.\n", statusAttribute, *file)
-		}
+		verboseOutput.Out(fmt.Sprintf("Deleting %s xattr on: %s.\n", statusAttribute, *file))
 		xattr.Remove(*file, statusAttribute)
 		os.Exit(1)
 	} else {
 		fmt.Printf("Upload succeeded.\n")
-		if true == *verbose {
-			fmt.Printf("Setting %s xattr to \"%s\" on: %s.\n", statusAttribute, "done", *file)
-		}
+		verboseOutput.Out(fmt.Sprintf("Setting %s xattr to \"%s\" on: %s.\n", statusAttribute, "done", *file))
 		err = xattr.Set(*file, statusAttribute, []byte("done"))
-		if err != nil {
+		if nil != err {
 			fmt.Printf("ERROR: Can't set extended attributes for: %s\n", *file)
 			os.Exit(1)
 		}
-		if true == *verbose {
-			fmt.Printf("Setting %s xattr to \"%s\" on: %s.\n", docUidAttribute, documentUid.String(), *file)
-		}
+		verboseOutput.Out(fmt.Sprintf("Setting %s xattr to \"%s\" on: %s.\n", docUidAttribute, documentUid.String(), *file))
 		err = xattr.Set(*file, docUidAttribute, []byte(documentUid.String()))
-		if err != nil {
+		if nil != err {
 			fmt.Printf("ERROR: Can't set extended attributes for: %s\n", *file)
 			os.Exit(1)
 		}
