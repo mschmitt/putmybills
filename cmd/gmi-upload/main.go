@@ -54,14 +54,6 @@ func main() {
 	}
 	fh.Close()
 
-	// Test if file is not open
-	lsof := exec.Command("lsof", *file)
-	err = lsof.Run() 
-	if nil == err {
-		fmt.Printf("ERROR: File is probably open by another process: %s\n", *file)
-		os.Exit(1)
-	}
-
 	// Test file for xattr capability
 	XattrList, err := xattr.List(*file);
 	if nil != err {
@@ -96,6 +88,14 @@ func main() {
 	// -> nothing - Proceed
 	} else {
 		verboseOutput.Out(fmt.Sprintf("No xattrs set. Will proceed with upload.\n"))
+	}
+
+	// Test if file is not open
+	lsof := exec.Command("lsof", *file)
+	err = lsof.Run() 
+	if nil == err {
+		fmt.Printf("ERROR: File is probably open by another process: %s\n", *file)
+		os.Exit(1)
 	}
 
 	// Set upload status xattr: uploading
