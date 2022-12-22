@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 
-doctype="${DOCTYPE:-MISC}"
-
 while read -r file
 do
-	if gmi-upload --apikey "${APIKEY}" --file "${file}" --doctype "${doctype}"
+	if gmi-upload --file "${file}"
 	then
 		if [[ -d "${1}/uploaded" ]]
 		then
