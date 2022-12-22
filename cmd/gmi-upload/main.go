@@ -2,6 +2,7 @@ package main
 
 import "fmt"
 import "os"
+import "os/exec"
 import "errors"
 import "strconv"
 import "path/filepath"
@@ -46,12 +47,20 @@ func main() {
 	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "Verbose",       strconv.FormatBool(*verbose)))
 
 	// -> File not found - error message and exit != 0
-	fh, err := os.OpenFile(*file, os.O_RDONLY, 0644)
+	fh, err := os.OpenFile(*file, os.O_RDONLY, 0)
 	if errors.Is(err, os.ErrNotExist) {
 		fmt.Printf("ERROR: File not found: %s\n", *file)
 		os.Exit(1)
 	}
 	fh.Close()
+
+	// Test if file is not open
+	lsof := exec.Command("lsof", *file)
+	err = lsof.Run() 
+	if nil == err {
+		fmt.Printf("ERROR: File is probably open by another process: %s\n", *file)
+		os.Exit(1)
+	}
 
 	// Test file for xattr capability
 	XattrList, err := xattr.List(*file);
