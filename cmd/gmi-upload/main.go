@@ -33,6 +33,7 @@ func main() {
 	resume   := parser.Flag("r", "resume", &argparse.Options{Required: false, Help: "Re-attempt dangling incomplete upload"})
 	reupload := parser.Flag("R", "reupload", &argparse.Options{Required: false, Help: "Force upload of already-uploaded document"})
 	verbose  := parser.Flag("v", "verbose", &argparse.Options{Required: false, Help: "Show verbose progress"})
+	quiet    := parser.Flag("q", "quiet", &argparse.Options{Required: false, Help: "Don't say 'already uploaded' on previously uploaded docs"})
 	err = parser.Parse(os.Args)
 	if nil != err {
 		fmt.Print(parser.Usage(err))
@@ -82,7 +83,9 @@ func main() {
 		if true == *reupload {
 			fmt.Printf("Will re-upload previously uploaded document: %s\n", *file)
 		} else {
-			fmt.Printf("File already marked as uploaded: %s\n", *file)
+			if false == *quiet {
+				fmt.Printf("File already marked as uploaded: %s\n", *file)
+			}
 			os.Exit(0)
 		}
 	// -> nothing - Proceed
