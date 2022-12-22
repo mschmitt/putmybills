@@ -47,6 +47,12 @@ func main() {
 		verboseOutput.Activate()
 	}
 
+	// Version requested
+	if true == *version {
+		fmt.Printf("Version: %s\n", gitCommit)
+		os.Exit(0)
+	}
+
 	// Some arguments may be passed by environment variable:
 	// GMI_APIKEY instead of -a/--apikey
 	envValue, envPresent = os.LookupEnv("GMI_APIKEY")
@@ -75,10 +81,6 @@ func main() {
 	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "Document type", *doctype))
 	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "Document note", *docnote))
 	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "Verbose",       strconv.FormatBool(*verbose)))
-	if true == *version {
-		fmt.Printf("Version: %s\n", gitCommit)
-		os.Exit(0)
-	}
 
 	// -> File not found - error message and exit != 0
 	fh, err := os.OpenFile(*file, os.O_RDONLY, 0)
