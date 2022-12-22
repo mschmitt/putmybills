@@ -195,7 +195,7 @@ func main() {
 		xattr.Remove(*file, statusAttribute)
 		os.Exit(1)
 	} else {
-		fmt.Printf("Upload succeeded.\n")
+		fmt.Printf("Upload succeeded for: %s\n", *file)
 		verboseOutput.Out(fmt.Sprintf("Setting %s xattr to \"%s\" on: %s.\n", statusAttribute, "done", *file))
 		err = xattr.Set(*file, statusAttribute, []byte("done"))
 		if nil != err {
