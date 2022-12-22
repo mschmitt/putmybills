@@ -18,6 +18,7 @@ import "verboseOutput"
 const statusAttribute string = "user.de.scsy.putmybills.upload-status"
 const docUidAttribute string = "user.de.scsy.putmybills.document-uid"
 const documentAPI string = "https://api.getmyinvoices.com/accounts/v3/documents"
+var gitCommit string
 
 func main() {
 	var err error
@@ -42,7 +43,8 @@ func main() {
 	if true == *verbose {
 		verboseOutput.Activate()
 	}
-	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n",  "API token",    *apikey))
+	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "Build",        gitCommit))
+	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "API token",    *apikey))
 	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "File",          *file))
 	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "Document type", *doctype))
 	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "Verbose",       strconv.FormatBool(*verbose)))
