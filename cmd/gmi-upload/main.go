@@ -14,8 +14,6 @@ import "github.com/akamensky/argparse"
 import "github.com/go-resty/resty/v2"
 import "verboseOutput"
 
-// https://api.getmyinvoices.com/accounts/v3/doc/#tag/Document/operation/Upload%20new%20document
-
 const statusAttribute string = "user.de.scsy.putmybills.upload-status"
 const docUidAttribute string = "user.de.scsy.putmybills.document-uid"
 const documentAPI string = "https://api.getmyinvoices.com/accounts/v3/documents"
@@ -26,11 +24,12 @@ func main() {
 	var uploadStatus string
 
 	// Establish arguments
-	parser := argparse.NewParser("gmi-upload", "Upload document to the GetMyInvoices API")
-	apitoken := parser.String("a", "apitoken", &argparse.Options{Required: true, Help: "API token"})
+	parser   := argparse.NewParser("gmi-upload", "Upload document to the GetMyInvoices API")
+	apikey   := parser.String("a", "apikey", &argparse.Options{Required: true, Help: "API key"})
 	file     := parser.String("f", "file", &argparse.Options{Required: true, Help: "File to upload"})
 	doctype  := parser.String("d", "doctype", &argparse.Options{Required: false, Default: "MISC", Help: "GMI document type"})
 	resume   := parser.Flag("r", "resume", &argparse.Options{Required: false, Help: "Re-attempt dangling incomplete upload"})
+	reupload := parser.Flag("R", "reupload", &argparse.Options{Required: false, Help: "Force upload of already-uploaded document"})
 	verbose  := parser.Flag("v", "verbose", &argparse.Options{Required: false, Help: "Show verbose progress"})
 	err = parser.Parse(os.Args)
 	if nil != err {
@@ -40,7 +39,7 @@ func main() {
 	if true == *verbose {
 		verboseOutput.Activate()
 	}
-	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n",  "API token",    *apitoken))
+	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n",  "API token",    *apikey))
 	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "File",          *file))
 	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "Document type", *doctype))
 	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "Verbose",       strconv.FormatBool(*verbose)))
@@ -76,10 +75,14 @@ func main() {
 			fmt.Printf("ERROR: Aborted upload detected for: %s (maybe retry using --resume)\n", *file)
 			os.Exit(1)
 		}
-	// -> done - Previous upload succeeded, info message and abort
+	// -> done - Previous upload succeeded
 	} else if "done" == uploadStatus {
-		fmt.Printf("File already marked as uploaded: %s\n", *file)
-		os.Exit(0)
+		if true == *reupload {
+			fmt.Printf("Will re-upload previously uploaded document: %s\n", *file)
+		} else {
+			fmt.Printf("File already marked as uploaded: %s\n", *file)
+			os.Exit(0)
+		}
 	// -> nothing - Proceed
 	} else {
 		verboseOutput.Out(fmt.Sprintf("No xattrs set. Will proceed with upload.\n"))
@@ -112,12 +115,8 @@ func main() {
 		os.Exit(1)
 	}
 	fileBase64 := base64.StdEncoding.EncodeToString(fileBytes)
-	// verboseOutput.Out(fmt.Sprintf("%s", fileBase64))
 
-	// Build JSON object containing:
-	// - fileName (basename *file)
-	// - documentType (*doctype)
-	// - fileContent (fileBase64)
+	// Build JSON object for upload
 	gmiPayloadData := map[string]interface{}{
 		"fileName": filepath.Base(*file),
 		"documentType": *doctype,
@@ -132,11 +131,10 @@ func main() {
 
 	// Upload to API
 	client := resty.New()
-	// Dummy API interaction (Get list of documents)
 	response, err := client.R().
 		EnableTrace().
 		SetHeader("Content-Type", "application/json").
-		SetHeader("X-API-KEY", *apitoken).
+		SetHeader("X-API-KEY", *apikey).
 		SetBody(gmiPayload).
 		Post(documentAPI)
 	if nil != err {
@@ -149,7 +147,7 @@ func main() {
 	// HTTP status is 200?
 	verboseOutput.Out(fmt.Sprintf("Checking HTTP status.\n"))
 	if response.StatusCode() != 200 {
-		fmt.Printf("ERROR: HTTP request to %s failed (HTTP status %s != 200).\n", documentAPI, response.StatusCode())
+		fmt.Printf("ERROR: HTTP request to %s failed (HTTP status %d != 200).\n", documentAPI, response.StatusCode())
 		uploadFailed = true;
 	}
 
@@ -157,7 +155,7 @@ func main() {
 	verboseOutput.Out(fmt.Sprintf("Looking for \"success\" in response.\n"))
 	success := gjson.Get(response.String(), "success")
 	if success.Type.String() == "Null" {
-		fmt.Printf("ERROR: No success reported (not even true or false).\n")
+		fmt.Printf("ERROR: No success reported (not even false).\n")
 		uploadFailed = true;
 	} else if success.Bool() != true {
 		fmt.Printf("ERROR: success false reported.\n")
@@ -174,8 +172,8 @@ func main() {
 
 	// Conclusion
 	if true == uploadFailed {
-		fmt.Printf("%s\n", response.String())
-		fmt.Printf("Upload failed.\n")
+		fmt.Printf("ERROR: Upload failed.\n")
+		fmt.Printf("Response from API was: %s\n", response.String())
 		fmt.Printf("Cleaning up.\n")
 		verboseOutput.Out(fmt.Sprintf("Deleting %s xattr on: %s.\n", statusAttribute, *file))
 		xattr.Remove(*file, statusAttribute)
