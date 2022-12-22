@@ -22,19 +22,22 @@ var gitCommit string
 
 func main() {
 	var err error
+	var envPresent bool
+	var envValue string
 	var uploadStatusBytes []byte
 	var uploadStatus string
 
 	// Establish arguments
 	parser   := argparse.NewParser("gmi-upload", "Upload document to the GetMyInvoices API")
-	apikey   := parser.String("a", "apikey", &argparse.Options{Required: true, Help: "API key"})
-	file     := parser.String("f", "file", &argparse.Options{Required: true, Help: "File to upload"})
+	apikey   := parser.String("a", "apikey", &argparse.Options{Required: false, Help: "API key"})
+	file     := parser.String("f", "file", &argparse.Options{Required: false, Help: "File to upload"})
 	doctype  := parser.String("d", "doctype", &argparse.Options{Required: false, Default: "MISC", Help: "GMI document type"})
 	docnote  := parser.String("n", "docnote", &argparse.Options{Required: false, Default: "Uploaded using https://github.com/mschmitt/putmybills", Help: "Document note"})
 	resume   := parser.Flag("r", "resume", &argparse.Options{Required: false, Help: "Re-attempt dangling incomplete upload"})
 	reupload := parser.Flag("R", "reupload", &argparse.Options{Required: false, Help: "Force upload of already-uploaded document"})
 	verbose  := parser.Flag("v", "verbose", &argparse.Options{Required: false, Help: "Show verbose progress"})
 	quiet    := parser.Flag("q", "quiet", &argparse.Options{Required: false, Help: "Don't say 'already uploaded' on previously uploaded docs"})
+	version  := parser.Flag("V", "version", &argparse.Options{Required: false, Help: "Show version string (git commit)"})
 	err = parser.Parse(os.Args)
 	if nil != err {
 		fmt.Print(parser.Usage(err))
@@ -43,11 +46,39 @@ func main() {
 	if true == *verbose {
 		verboseOutput.Activate()
 	}
-	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "Build",        gitCommit))
-	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "API token",    *apikey))
+
+	// Some arguments may be passed by environment variable:
+	// GMI_APIKEY instead of -a/--apikey
+	envValue, envPresent = os.LookupEnv("GMI_APIKEY")
+	if envPresent == true {
+		*apikey = envValue
+	} else if 0 == len(*apikey) {
+		fmt.Printf("ERROR: Missing option -a/--apikey or Environment GMI_APIKEY\n")
+		fmt.Print(parser.Usage(err))
+		os.Exit(1)
+	}
+	// GMI_DOCTYPE instead of -d/--doctype
+	envValue, envPresent = os.LookupEnv("GMI_DOCTYPE")
+	if envPresent == true {
+		*doctype = envValue
+	}
+	// GMI_DOCNOTE instead of -n/--docnote
+	envValue, envPresent = os.LookupEnv("GMI_DOCNOTE")
+	if envPresent == true {
+		*docnote = envValue
+	}
+
+	// Dump parameters at start of verbose operation
+	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "Commit",        gitCommit))
+	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "API token",     *apikey))
 	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "File",          *file))
 	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "Document type", *doctype))
+	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "Document note", *docnote))
 	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "Verbose",       strconv.FormatBool(*verbose)))
+	if true == *version {
+		fmt.Printf("Version: %s\n", gitCommit)
+		os.Exit(0)
+	}
 
 	// -> File not found - error message and exit != 0
 	fh, err := os.OpenFile(*file, os.O_RDONLY, 0)
