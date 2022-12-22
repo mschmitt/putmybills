@@ -28,6 +28,7 @@ func main() {
 	apikey   := parser.String("a", "apikey", &argparse.Options{Required: true, Help: "API key"})
 	file     := parser.String("f", "file", &argparse.Options{Required: true, Help: "File to upload"})
 	doctype  := parser.String("d", "doctype", &argparse.Options{Required: false, Default: "MISC", Help: "GMI document type"})
+	docnote  := parser.String("n", "docnote", &argparse.Options{Required: false, Default: "Uploaded using https://github.com/mschmitt/putmybills", Help: "Document note"})
 	resume   := parser.Flag("r", "resume", &argparse.Options{Required: false, Help: "Re-attempt dangling incomplete upload"})
 	reupload := parser.Flag("R", "reupload", &argparse.Options{Required: false, Help: "Force upload of already-uploaded document"})
 	verbose  := parser.Flag("v", "verbose", &argparse.Options{Required: false, Help: "Show verbose progress"})
@@ -121,6 +122,7 @@ func main() {
 		"fileName": filepath.Base(*file),
 		"documentType": *doctype,
 		"fileContent": fileBase64,
+		"note": *docnote,
 	}
 	gmiPayload, err := json.Marshal(gmiPayloadData)
 	if nil != err {
