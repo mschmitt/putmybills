@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 
+if [[ ! -d "${1}" ]]
+then
+	printf "No directory: %s\n" "${1}"
+	exit 1
+fi
 while read -r file
 do
-	if gmi-upload --file "${file}"
+	if gmi-upload --file "${file}" && [[ -d "${1}/uploaded" ]]
 	then
-		if [[ -d "${1}/uploaded" ]]
-		then
-			mv "${file}" "${1}/uploaded"
-		fi
+		mv -v "${file}" "${1}/uploaded"
 	fi
 done < <(find "${1}" -maxdepth 1 -type f -iname '*.PDF')
