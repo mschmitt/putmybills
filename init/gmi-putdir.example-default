@@ -1,0 +1,4 @@
+# /etc/default/gmi-putdir
+GMI_PUTDIR=/export/Belegscans
+GMI_APIKEY=xxx
+GMI_DOCTYPE=MISC
