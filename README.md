@@ -2,7 +2,7 @@
 
 putmybills is an uploader for the GetMyInvoices API
 
-[See the Wiki](https://github.com/mschmitt/putmybills/wiki) for more information.
+[See the Wiki](https://github.com/mschmitt/putmybills/wiki) for information in German.
 
 # License
 
