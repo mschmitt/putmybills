@@ -29,7 +29,7 @@ func main() {
 	file     := parser.String("f", "file", &argparse.Options{Required: false, Help: "File to upload"})
 	doctype  := parser.String("d", "doctype", &argparse.Options{Required: false, Default: "MISC", Help: "GMI document type"})
 	docnote  := parser.String("n", "docnote", &argparse.Options{Required: false, Default: "Uploaded using https://github.com/mschmitt/putmybills", Help: "Document note"})
-	resume   := parser.Flag("r", "resume", &argparse.Options{Required: false, Help: "Re-attempt dangling incomplete upload"})
+	resume   := parser.Flag("r", "reattempt", &argparse.Options{Required: false, Help: "Re-attempt dangling incomplete upload"})
 	reupload := parser.Flag("R", "reupload", &argparse.Options{Required: false, Help: "Force upload of already-uploaded document"})
 	verbose  := parser.Flag("v", "verbose", &argparse.Options{Required: false, Help: "Show verbose progress"})
 	quiet    := parser.Flag("q", "quiet", &argparse.Options{Required: false, Help: "Don't say 'already uploaded' on previously uploaded docs"})
@@ -96,6 +96,19 @@ func main() {
 			os.Exit(1)
 		}
 	}
+	// -> sidecarFile "failed" exists - Previous upload explicitly failed
+	_, err = sidecarFile.Read(*file, "failed")
+	if nil == err {
+		if true == *reupload {
+			fmt.Printf("Will re-upload previously failed file: %s\n", *file)
+		} else {
+			if false == *quiet {
+				fmt.Printf("File previously failed to upload: %s\n", *file)
+			}
+			os.Exit(1)
+		}
+	}
+
 	// -> sidecarFile "done" exists - Previous upload succeeded
 	_, err = sidecarFile.Read(*file, "done")
 	if nil == err {
