@@ -7,6 +7,7 @@ require (
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/pkg/xattr v0.4.9
 	github.com/tidwall/gjson v1.14.4
+	sidecarFile v0.0.0-00010101000000-000000000000
 	verboseOutput v0.0.0-00010101000000-000000000000
 )
 
@@ -18,3 +19,5 @@ require (
 )
 
 replace verboseOutput => ../../internal/verboseOutput
+
+replace sidecarFile => ../../internal/sidecarFile

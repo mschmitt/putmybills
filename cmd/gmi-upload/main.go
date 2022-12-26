@@ -10,13 +10,11 @@ import "io/ioutil"
 import "encoding/base64"
 import "encoding/json"
 import "github.com/tidwall/gjson"
-import "github.com/pkg/xattr"
 import "github.com/akamensky/argparse"
 import "github.com/go-resty/resty/v2"
 import "verboseOutput"
+import "sidecarFile"
 
-const statusAttribute string = "user.de.scsy.putmybills.upload-status"
-const docUidAttribute string = "user.de.scsy.putmybills.document-uid"
 const documentAPI string = "https://api.getmyinvoices.com/accounts/v3/documents"
 var gitCommit string
 
@@ -24,8 +22,6 @@ func main() {
 	var err error
 	var envPresent bool
 	var envValue string
-	var uploadStatusBytes []byte
-	var uploadStatus string
 
 	// Establish arguments
 	parser   := argparse.NewParser("gmi-upload", "Upload document to the GetMyInvoices API")
@@ -90,31 +86,19 @@ func main() {
 	}
 	fh.Close()
 
-	// Test file for xattr capability
-	XattrList, err := xattr.List(*file);
-	if nil != err {
-		fmt.Printf("ERROR: Can't retrieve extended attributes for: %s\n", *file)
-		os.Exit(1)
-	}
-	verboseOutput.Out(fmt.Sprintf("extended attributes for file: %s\n", *file))
-	verboseOutput.Out(fmt.Sprintln(XattrList))
-
-	// Get upload status xattr from file - user.putmybills.upload-status
-	// - Error is expected at this point (empty attribute). 
-	// - No error handling.
-	uploadStatusBytes, err = xattr.Get(*file, statusAttribute);
-	uploadStatus = string(uploadStatusBytes)
-
-	// -> uploading - Previous upload failed without cleanup: error message and exit != 0
-	if "uploading" == uploadStatus {
+	// -> sidecarFile "uploading" exists - Previous upload failed without cleanup: error message and exit != 0
+	_, err = sidecarFile.Read(*file, "uploading")
+	if nil == err {
 		if true == *resume {
 			fmt.Printf("Will resume aborted upload for: %s\n", *file)
 		} else {
 			fmt.Printf("ERROR: Aborted upload detected for: %s (maybe retry using --resume)\n", *file)
 			os.Exit(1)
 		}
-	// -> done - Previous upload succeeded
-	} else if "done" == uploadStatus {
+	}
+	// -> sidecarFile "done" exists - Previous upload succeeded
+	_, err = sidecarFile.Read(*file, "done")
+	if nil == err {
 		if true == *reupload {
 			fmt.Printf("Will re-upload previously uploaded document: %s\n", *file)
 		} else {
@@ -123,33 +107,30 @@ func main() {
 			}
 			os.Exit(0)
 		}
-	// -> nothing - Proceed
-	} else {
-		verboseOutput.Out(fmt.Sprintf("No xattrs set. Will proceed with upload.\n"))
 	}
 
 	// Test if file is not open
 	lsof := exec.Command("lsof", *file)
-	err = lsof.Run() 
+	err = lsof.Run()
 	if nil == err {
 		fmt.Printf("ERROR: File is probably open by another process: %s\n", *file)
 		os.Exit(1)
 	}
 
-	// Set upload status xattr: uploading
-	verboseOutput.Out(fmt.Sprintf("Setting %s xattr to \"%s\" on: %s.\n", statusAttribute, "uploading", *file))
-	err = xattr.Set(*file, statusAttribute, []byte("uploading"))
+	// Clear existing status and set "uploading" status
+	verboseOutput.Out(fmt.Sprintf("Setting sidecarFile status to \"%s\" on: %s.\n", "uploading", *file))
+	sidecarFile.DeleteAny(*file)
+	_, err = sidecarFile.Create(*file, "uploading", "")
 	if nil != err {
-		fmt.Printf("ERROR: Can't set extended attributes for: %s\n", *file)
+		fmt.Printf("ERROR: %s\n", err)
 		os.Exit(1)
 	}
 
-	// Read back to confirm that attribute was set
-	verboseOutput.Out(fmt.Sprintf("Reading back %s xattr (expecting: \"%s\") from: %s\n", statusAttribute, "uploading", *file))
-	uploadStatusBytes, err = xattr.Get(*file, statusAttribute);
-	uploadStatus = string(uploadStatusBytes)
+	// Read back to confirm that sidecar file was set
+	verboseOutput.Out(fmt.Sprintf("Reading back \"%s\" upload status from: %s\n", "uploading", *file))
+	_, err = sidecarFile.Read(*file, "uploading")
 	if nil != err {
-		fmt.Printf("ERROR: Can't read back attribute %s for: %s\n", statusAttribute, *file)
+		fmt.Printf("ERROR: Can't read back status \"%s\" for: %s\n", "uploading", *file)
 		os.Exit(1)
 	}
 
@@ -220,27 +201,18 @@ func main() {
 	}
 
 	// Conclusion
+	sidecarFile.Delete(*file, "uploading")
 	if true == uploadFailed {
 		fmt.Printf("ERROR: Upload failed.\n")
 		fmt.Printf("Response from API was: %s\n", response.String())
 		fmt.Printf("Cleaning up.\n")
-		verboseOutput.Out(fmt.Sprintf("Deleting %s xattr on: %s.\n", statusAttribute, *file))
-		xattr.Remove(*file, statusAttribute)
+		verboseOutput.Out(fmt.Sprintf("Setting \"%s\" status on %s.\n", "failed", *file))
+		sidecarFile.Create(*file, "failed", response.String())
 		os.Exit(1)
 	} else {
 		fmt.Printf("Upload succeeded for: %s\n", *file)
-		verboseOutput.Out(fmt.Sprintf("Setting %s xattr to \"%s\" on: %s.\n", statusAttribute, "done", *file))
-		err = xattr.Set(*file, statusAttribute, []byte("done"))
-		if nil != err {
-			fmt.Printf("ERROR: Can't set extended attributes for: %s\n", *file)
-			os.Exit(1)
-		}
-		verboseOutput.Out(fmt.Sprintf("Setting %s xattr to \"%s\" on: %s.\n", docUidAttribute, documentUid.String(), *file))
-		err = xattr.Set(*file, docUidAttribute, []byte(documentUid.String()))
-		if nil != err {
-			fmt.Printf("ERROR: Can't set extended attributes for: %s\n", *file)
-			os.Exit(1)
-		}
+		verboseOutput.Out(fmt.Sprintf("Setting \"%s\" status on: %s.\n", "done", *file))
+		sidecarFile.Create(*file, "done", response.String())
 		os.Exit(0)
 	}
 }
