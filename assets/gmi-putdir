@@ -7,8 +7,8 @@ then
 fi
 while read -r file
 do
-	if gmi-upload --file "${file}" && [[ -d "${1}/uploaded" ]]
+	if gmi-upload --file "${file}" && [[ -d "${GMI_MOVETO}" ]]
 	then
-		mv -v "${file}" "${1}/uploaded"
+		mv -v "${file}" "${GMI_MOVETO}"
 	fi
 done < <(find "${1}" -maxdepth 1 -type f -iname '*.PDF')
