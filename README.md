@@ -1,6 +1,6 @@
 # putmybills
 
-putmybills is an uploader for the GetMyInvoices API
+**putmybills** is an uploader for the [GetMyInvoices](https://getmyinvoices.com) API
 
 [See the Wiki](https://github.com/mschmitt/putmybills/wiki) for information in German.
 
