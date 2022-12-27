@@ -1,0 +1,7 @@
+[Unit]
+Description=GMI Upload (service)
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/default/gmi-putdir
+ExecStart=sh -c 'gmi-putdir "${GMI_PUTDIR}"'

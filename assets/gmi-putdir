@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+if [[ ! -d "${1}" ]]
+then
+	printf "No directory: %s\n" "${1}"
+	exit 1
+fi
+while read -r file
+do
+	if gmi-upload --file "${file}" && [[ -d "${GMI_MOVETO}" ]]
+	then
+		mv -v "${file}" "${GMI_MOVETO}"
+		mv -v "${file}".done "${GMI_MOVETO}"
+	fi
+done < <(find "${1}" -maxdepth 1 -type f -iname '*.PDF')

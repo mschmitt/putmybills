@@ -1,0 +1,8 @@
+[Unit]
+Description=GMI Upload (timer)
+
+[Timer]
+OnCalendar=*-*-* *:0/5:00
+
+[Install]
+WantedBy=timers.target
