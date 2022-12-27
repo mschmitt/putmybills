@@ -1,0 +1,18 @@
+name: Go
+
+on:
+  push:
+    branches: [ "work-in-progress" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19
+    - name: Make
+      run: make -C cmd/gmi-upload
