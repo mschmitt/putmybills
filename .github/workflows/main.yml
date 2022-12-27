@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v3
+    - name: Get tags
+      run: git fetch --tags origin
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
