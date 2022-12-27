@@ -29,10 +29,10 @@ func main() {
 	file     := parser.String("f", "file", &argparse.Options{Required: false, Help: "File to upload"})
 	doctype  := parser.String("d", "doctype", &argparse.Options{Required: false, Default: "MISC", Help: "GMI document type"})
 	docnote  := parser.String("n", "docnote", &argparse.Options{Required: false, Default: "Uploaded using https://github.com/mschmitt/putmybills", Help: "Document note"})
-	resume   := parser.Flag("r", "reattempt", &argparse.Options{Required: false, Help: "Re-attempt dangling incomplete upload"})
+	reattempt:= parser.Flag("r", "reattempt", &argparse.Options{Required: false, Help: "Re-attempt dangling incomplete upload"})
 	reupload := parser.Flag("R", "reupload", &argparse.Options{Required: false, Help: "Force upload of already-uploaded document"})
 	verbose  := parser.Flag("v", "verbose", &argparse.Options{Required: false, Help: "Show verbose progress"})
-	quiet    := parser.Flag("q", "quiet", &argparse.Options{Required: false, Help: "Don't say 'already uploaded' on previously uploaded docs"})
+	quiet    := parser.Flag("q", "quiet", &argparse.Options{Required: false, Help: "Don't report 'already uploaded' on previously uploaded docs"})
 	version  := parser.Flag("V", "version", &argparse.Options{Required: false, Help: "Show version string (git commit)"})
 	err = parser.Parse(os.Args)
 	if nil != err {
@@ -89,13 +89,14 @@ func main() {
 	// -> sidecarFile "uploading" exists - Previous upload failed without cleanup: error message and exit != 0
 	_, err = sidecarFile.Read(*file, "uploading")
 	if nil == err {
-		if true == *resume {
-			fmt.Printf("Will resume aborted upload for: %s\n", *file)
+		if true == *reattempt {
+			fmt.Printf("Will reattempt aborted upload for: %s\n", *file)
 		} else {
-			fmt.Printf("ERROR: Aborted upload detected for: %s (maybe retry using --resume)\n", *file)
+			fmt.Printf("ERROR: Aborted upload detected for: %s (maybe retry using --reattempt)\n", *file)
 			os.Exit(1)
 		}
 	}
+
 	// -> sidecarFile "failed" exists - Previous upload explicitly failed
 	_, err = sidecarFile.Read(*file, "failed")
 	if nil == err {
