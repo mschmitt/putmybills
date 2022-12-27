@@ -17,6 +17,6 @@ jobs:
       with:
         go-version: 1.19
     - name: WTF
-      rund: find .
+      run: find .
     - name: Make
       run: make -C putmybills/cmd/gmi-upload
