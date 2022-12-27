@@ -2,7 +2,7 @@ name: Go
 
 on:
   push:
-    branches: [ "work-in-progress" ]
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
