@@ -1,4 +1,10 @@
 # /etc/default/gmi-putdir
+#
+# Notes:
+# - $GMI_PUTDIR is evaluated in gmi-putdir.service.
+# - $GMI_MOVETO is evaluated in the gmi-putdir script
+# - $GMI_APIKEY and $GMI_DOCTYPE are passed on to gmi-upload via gmi-putdir.service
+#
 GMI_PUTDIR=/export/Belegscans
 GMI_MOVETO=/export/Belegscans/uploaded
 GMI_APIKEY=xxx
