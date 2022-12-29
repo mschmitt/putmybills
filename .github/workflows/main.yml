@@ -14,14 +14,22 @@ jobs:
         fetch-depth: 0
     - name: Get tags
       run: git fetch --tags origin
+    - name: Prepare git rev-describe
+      run: git config --global alias.rev-describe '!git describe --match "v*.*.*" --tags || git describe --match "v*.*.*" --tags || git describe --match "v*.*.*" --tags || git rev-parse --short=8 HEAD'
+    - name: rev-describe
+      run: printf "REV_DESCRIBE=%s\n" "$(git rev-describe)" | tee -a "${GITHUB_ENV}"
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
         go-version: 1.19
     - name: Make
       run: make -C cmd/gmi-upload
+    - name: Prepare dist dir
+      run: mkdir dist
+    - name: Copy artifacts to dist
+      run: cp {cmd/gmi-upload/gmi-upload-*-*,assets/gmi-putdir,init/*} dist/      
     - name: Upload Artifacts
       uses: actions/upload-artifact@v3.1.1
       with:
-        name: putmybills-bin
-        path: "{cmd/gmi-upload/gmi-upload-*-*,assets/gmi-putdir,init/*}"
+        name: putmybills-{{ env.REV_DESCRIBE }}
+        path: "dist/*"
