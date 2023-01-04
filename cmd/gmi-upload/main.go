@@ -39,9 +39,7 @@ func main() {
 		fmt.Print(parser.Usage(err))
 		os.Exit(1)
 	}
-	if true == *verbose {
-		verboseOutput.Activate()
-	}
+	vo := verboseOutput.New(*verbose)
 
 	// Version requested
 	if true == *version {
@@ -71,12 +69,12 @@ func main() {
 	}
 
 	// Dump parameters at start of verbose operation
-	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "Commit",        gitCommit))
-	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "API token",     *apikey))
-	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "File",          *file))
-	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "Document type", *doctype))
-	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "Document note", *docnote))
-	verboseOutput.Out(fmt.Sprintf("%-13s: %s\n", "Verbose",       strconv.FormatBool(*verbose)))
+	vo.Out(fmt.Sprintf("%-13s: %s\n", "Commit",        gitCommit))
+	vo.Out(fmt.Sprintf("%-13s: %s\n", "API token",     *apikey))
+	vo.Out(fmt.Sprintf("%-13s: %s\n", "File",          *file))
+	vo.Out(fmt.Sprintf("%-13s: %s\n", "Document type", *doctype))
+	vo.Out(fmt.Sprintf("%-13s: %s\n", "Document note", *docnote))
+	vo.Out(fmt.Sprintf("%-13s: %s\n", "Verbose",       strconv.FormatBool(*verbose)))
 
 	// -> File not found - error message and exit != 0
 	fh, err := os.OpenFile(*file, os.O_RDONLY, 0)
@@ -132,7 +130,7 @@ func main() {
 	}
 
 	// Clear existing status and set "uploading" status
-	verboseOutput.Out(fmt.Sprintf("Setting sidecarFile status to \"%s\" on: %s.\n", "uploading", *file))
+	vo.Out(fmt.Sprintf("Setting sidecarFile status to \"%s\" on: %s.\n", "uploading", *file))
 	sidecarFile.DeleteAny(*file)
 	_, err = sidecarFile.Create(*file, "uploading", "")
 	if nil != err {
@@ -141,7 +139,7 @@ func main() {
 	}
 
 	// Read back to confirm that sidecar file was set
-	verboseOutput.Out(fmt.Sprintf("Reading back \"%s\" upload status from: %s\n", "uploading", *file))
+	vo.Out(fmt.Sprintf("Reading back \"%s\" upload status from: %s\n", "uploading", *file))
 	_, err = sidecarFile.Read(*file, "uploading")
 	if nil != err {
 		fmt.Printf("ERROR: Can't read back status \"%s\" for: %s\n", "uploading", *file)
@@ -171,7 +169,7 @@ func main() {
 		fmt.Printf("ERROR: json encoding failed: %s\n", err)
 		os.Exit(1)
 	}
-	verboseOutput.Out(fmt.Sprintf("%+v\n", string(gmiPayload)))
+	vo.Out(fmt.Sprintf("%+v\n", string(gmiPayload)))
 
 	// Upload to API
 	client := resty.New()
@@ -189,14 +187,14 @@ func main() {
 	// Analyze response
 
 	// HTTP status is 200?
-	verboseOutput.Out(fmt.Sprintf("Checking HTTP status.\n"))
+	vo.Out(fmt.Sprintf("Checking HTTP status.\n"))
 	if response.StatusCode() != 200 {
 		fmt.Printf("ERROR: HTTP request to %s failed (HTTP status %d != 200).\n", documentAPI, response.StatusCode())
 		uploadFailed = true;
 	}
 
 	// Success?
-	verboseOutput.Out(fmt.Sprintf("Looking for \"success\" in response.\n"))
+	vo.Out(fmt.Sprintf("Looking for \"success\" in response.\n"))
 	success := gjson.Get(response.String(), "success")
 	if success.Type.String() == "Null" {
 		fmt.Printf("ERROR: No success reported (not even false).\n")
@@ -207,7 +205,7 @@ func main() {
 	}
 
 	// Got documentUid?
-	verboseOutput.Out(fmt.Sprintf("Looking for \"documentUid\" in response.\n"))
+	vo.Out(fmt.Sprintf("Looking for \"documentUid\" in response.\n"))
 	documentUid := gjson.Get(response.String(), "documentUid")
 	if documentUid.Type.String() == "Null" {
 		fmt.Printf("ERROR: No documentUid reported.\n")
@@ -220,12 +218,12 @@ func main() {
 		fmt.Printf("ERROR: Upload failed.\n")
 		fmt.Printf("Response from API was: %s\n", response.String())
 		fmt.Printf("Cleaning up.\n")
-		verboseOutput.Out(fmt.Sprintf("Setting \"%s\" status on %s.\n", "failed", *file))
+		vo.Out(fmt.Sprintf("Setting \"%s\" status on %s.\n", "failed", *file))
 		sidecarFile.Create(*file, "failed", response.String())
 		os.Exit(1)
 	} else {
 		fmt.Printf("Upload succeeded for: %s\n", *file)
-		verboseOutput.Out(fmt.Sprintf("Setting \"%s\" status on: %s.\n", "done", *file))
+		vo.Out(fmt.Sprintf("Setting \"%s\" status on: %s.\n", "done", *file))
 		sidecarFile.Create(*file, "done", response.String())
 		os.Exit(0)
 	}
